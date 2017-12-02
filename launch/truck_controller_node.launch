@@ -1,0 +1,5 @@
+<!-- http://wiki.ros.org/roslaunch/XML/node -->
+<launch>
+  <node name="truck_controller_node" pkg="truck_controller" type="truck_controller_node" output="screen">
+  </node>
+</launch>
