@@ -77,6 +77,11 @@ int main(int argc, char** argv){
   // Initialize ROS
   ros::init(argc, argv, "hc_sr04");
 
+  // ROS node handler
+  ros::NodeHandle nodeHandler;
+  TruckConfiguration config = TruckConfiguration(nodeHandler);
+
+
   // Connect to gpiod using default parameters
   const int pi = pigpio_start(NULL, NULL);
   if(pi < 0){
@@ -119,9 +124,6 @@ int main(int argc, char** argv){
 
 
   std::cout << "--- Starting truck controller ---" << std::endl;
-
-  // ROS node handler
-  ros::NodeHandle nodeHandler;
 
   // Controller
   TruckController controller = TruckController(pi, nodeHandler, THROTTLE_PIN, STEERING_PIN);
