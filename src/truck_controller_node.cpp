@@ -30,11 +30,11 @@ class TruckConfiguration {
   bool debug;
 public:
   TruckConfiguration(const ros::NodeHandle& nh) {
-    nh.param<int>("throttle-pin", throttlePin, THROTTLE_PIN);
-    nh.param<int>("steering-pin", steeringPin, STEERING_PIN);
-    nh.param<int>("message-queue-size", msgQueueSize, MSG_QUEUE_SIZE);
-    nh.param<std::string>("topic-throttle", topicThrottle, TOPIC_THROTTLE);
-    nh.param<std::string>("topic-steering", topicSteering, TOPIC_STEERING);
+    nh.param<int>("throttle_pin", throttlePin, THROTTLE_PIN);
+    nh.param<int>("steering_pin", steeringPin, STEERING_PIN);
+    nh.param<int>("message_queue_size", msgQueueSize, MSG_QUEUE_SIZE);
+    nh.param<std::string>("topic_throttle", topicThrottle, TOPIC_THROTTLE);
+    nh.param<std::string>("topic_steering", topicSteering, TOPIC_STEERING);
     nh.param<bool>("debug", debug, false);
   }
   int getThrottlePin() { return throttlePin; }
@@ -52,13 +52,16 @@ class ServoListener {
   const int piHandle;
   const int pinServo;
   ros::Subscriber subscriber;
+  const std::string name;
 public:
-  ServoListener(const int pi, const int pin, const bool debugOn) :
-    piHandle(pi), pinServo(pin), debug(debugOn){
+  ServoListener(const std::string listenerName, const int pi, const int pin, const bool debugOn) :
+    name(listenerName), piHandle(pi), pinServo(pin), debug(debugOn){
+    // Initialize the servos to a neutral position when starting
+    set_servo_pulsewidth(piHandle, pin, 1500);
   }
   void onServoMessage(const std_msgs::UInt32::ConstPtr& message) {
-    if(debug)
-      printf("Received steering: %d\n", message->data);
+//    if(debug)
+    printf("%s received: %d\n", name.c_str(), message->data);
     // Set the pulse width specified in the message
     int pulseWidth = (int)message->data;
     if(pulseWidth > 2000) { pulseWidth == 2000; }
@@ -103,8 +106,8 @@ public:
     config(truckConfig),
     piHandle(pi),
     nodeHandle(nh),
-    throttleListener(pi, truckConfig.getThrottlePin(), truckConfig.getDebug()),
-    steeringListener(pi, truckConfig.getSteeringPin(), truckConfig.getDebug()) {
+    throttleListener("throttle listener", pi, truckConfig.getThrottlePin(), truckConfig.getDebug()),
+    steeringListener("steering listener", pi, truckConfig.getSteeringPin(), truckConfig.getDebug()) {
   }
   bool initGPIO() {
     // This will stop evaluation on the first failed setup and return false
