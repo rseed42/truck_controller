@@ -26,6 +26,7 @@ class TruckConfiguration {
   int msgQueueSize;
   string topicThrottle;
   string topicSteering;
+  bool debug;
 public:
   TruckConfiguration(const ros::NodeHandle& nh) {
     nh.param<int>("throttle-pin", throttlePin, THROTTLE_PIN);
@@ -33,12 +34,14 @@ public:
     nh.param<int>("message-queue-size", msgQueueSize, MSG_QUEUE_SIZE);
     nh.param<std::string>("topic-throttle", topicThrottle, TOPIC_THROTTLE);
     nh.param<std::string>("topic-steering", topicSteering, TOPIC_STEERING);
+    nh.param<bool>("debug", debug, false);
   }
   int getThrottlePin() { return throttlePin; }
   int getSterringPin() { return steeringPin; }
   int getMsgQueueSize() { return msgQueueSize; }
   std::string getTopicThrottle() { return topicThrottle; }
   std::string getTopicSteering() { return topicSteering; }
+  bool getDebug() { return debug; }
 };
 //------------------------------------------------------------------------------
 // Controller
