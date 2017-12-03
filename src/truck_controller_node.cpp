@@ -10,13 +10,36 @@ using namespace std;
 #define ERROR_CONNECTION_FAILED 1
 
 //------------------------------------------------------------------------------
-// Default configuration
+// Default parameters
 //------------------------------------------------------------------------------
 const int THROTTLE_PIN = 25;
 const int STEERING_PIN = 18;
 const int MSG_QUEUE_SIZE = 10;
 const string TOPIC_THROTTLE = "/controller/throttle";
 const string TOPIC_STEERING = "/controller/steering";
+//------------------------------------------------------------------------------
+// Configuration object
+//------------------------------------------------------------------------------
+class TruckConfiguration {
+  int throttlePin;
+  int steeringPin;
+  int msgQueueSize;
+  string topicThrottle;
+  string topicSteering;
+public:
+  TruckConfiguration(const ros::NodeHandle& nh) {
+    nh.param<int>("throttle-pin", throttlePin, THROTTLE_PIN);
+    nh.param<int>("steering-pin", steeringPin, STEERING_PIN);
+    nh.param<int>("message-queue-size", msgQueueSize, MSG_QUEUE_SIZE);
+    nh.param<std::string>("topic-throttle", topicThrottle, TOPIC_THROTTLE);
+    nh.param<std::string>("topic-steering", topicSteering, TOPIC_STEERING);
+  }
+  int getThrottlePin() { return throttlePin; }
+  int getSterringPin() { return steeringPin; }
+  int getMsgQueueSize() { return msgQueueSize; }
+  std::string getTopicThrottle() { return topicThrottle; }
+  std::string getTopicSteering() { return topicSteering; }
+};
 //------------------------------------------------------------------------------
 // Controller
 //------------------------------------------------------------------------------
