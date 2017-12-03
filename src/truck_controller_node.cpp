@@ -7,8 +7,9 @@ using namespace std;
 //------------------------------------------------------------------------------
 // Error codes
 //------------------------------------------------------------------------------
-#define ERROR_CONNECTION_FAILED 1
-
+#define ERROR_GPIOD_CONNECTION_FAILED 1
+#define ERROR_GPIO_MODE_SETUP_FAILED  2
+#define ERROR_LISTENER_REGISTER_FAILED 3
 //------------------------------------------------------------------------------
 // Default parameters
 //------------------------------------------------------------------------------
@@ -37,7 +38,7 @@ public:
     nh.param<bool>("debug", debug, false);
   }
   int getThrottlePin() { return throttlePin; }
-  int getSterringPin() { return steeringPin; }
+  int getSteeringPin() { return steeringPin; }
   int getMsgQueueSize() { return msgQueueSize; }
   std::string getTopicThrottle() { return topicThrottle; }
   std::string getTopicSteering() { return topicSteering; }
@@ -50,6 +51,7 @@ class ServoListener {
   const bool debug;
   const int piHandle;
   const int pinServo;
+  ros::Subscriber subscriber;
 public:
   ServoListener(const int pi, const int pin, const bool debugOn) :
     piHandle(pi), pinServo(pin), debug(debugOn){
@@ -63,6 +65,11 @@ public:
     else if(pulseWidth < 1000) { pulseWidth == 1000; }
     set_servo_pulsewidth(piHandle, pinServo, pulseWidth);
   }
+  bool subscribe(ros::NodeHandle& nh, std::string topic, int queue_size) {
+    subscriber = nh.subscribe(topic, queue_size, &ServoListener::onServoMessage, this);
+     if(subscriber) return true;
+     return false;
+  }
 };
 //------------------------------------------------------------------------------
 // Controller
@@ -70,10 +77,10 @@ public:
 class TruckController {
 private:
   const int piHandle;
-  const ros::NodeHandle nodeHandle;
-  const int pinThrottle;
-  const int pinSteering;
-
+  ros::NodeHandle nodeHandle;
+  TruckConfiguration config;
+  ServoListener throttleListener;
+  ServoListener steeringListener;
   // GPIO Setup. Sets mode to OUTPUT.
   bool setupGPIO(const int pin) {
     if(set_mode(piHandle, pin, PI_OUTPUT) != 0) {
@@ -92,21 +99,21 @@ private:
   }
 
 public:
-  TruckController(const int pi, ros::NodeHandle& nh, const int throttle, const int steering) :
-    piHandle(pi), nodeHandle(nh), pinThrottle(throttle), pinSteering(steering) {
-
+  TruckController(TruckConfiguration& truckConfig , const int pi, ros::NodeHandle& nh) :
+    config(truckConfig),
+    piHandle(pi),
+    nodeHandle(nh),
+    throttleListener(pi, truckConfig.getThrottlePin(), truckConfig.getDebug()),
+    steeringListener(pi, truckConfig.getSteeringPin(), truckConfig.getDebug()) {
   }
-
-  void onThrottleMsg(const std_msgs::UInt32::ConstPtr& msg) {
-    printf("Received throttle: %d\n", msg->data);
-    int width = (int)msg->data;
-    set_servo_pulsewidth(piHandle, pinThrottle, width);
+  bool initGPIO() {
+    // This will stop evaluation on the first failed setup and return false
+    return setupGPIO(config.getThrottlePin()) && setupGPIO(config.getSteeringPin());
   }
-
-  void onSteeringMsg(const std_msgs::UInt32::ConstPtr& msg) {
-    printf("Received steering: %d\n", msg->data);
-    int width = (int)msg->data;
-    set_servo_pulsewidth(piHandle, pinSteering, width);
+  bool registerListeners() {
+     // Subscribe both listeners or fail on error
+    return throttleListener.subscribe(nodeHandle, config.getTopicThrottle(), config.getMsgQueueSize()) &&
+           steeringListener.subscribe(nodeHandle, config.getTopicSteering(), config.getMsgQueueSize());
   }
 
 };
@@ -120,69 +127,21 @@ int main(int argc, char** argv){
 
   // ROS node handler
   ros::NodeHandle nodeHandler;
-  TruckConfiguration config = TruckConfiguration(nodeHandler);
 
+  // Load configuration parameters from the launch file
+  TruckConfiguration config = TruckConfiguration(nodeHandler);
 
   // Connect to gpiod using default parameters
   const int pi = pigpio_start(NULL, NULL);
   if(pi < 0){
-    printf("Could not connect to pigpiod\n");
+    printf("Could not connect to the pigpiod daemon. Aborting.\n");
+    return ERROR_GPIOD_CONNECTION_FAILED;
   }
 
-  // Setup the GPIO pins
-  // TODO: put this to the Controller class
-  // PI_BAD_GPIO, PI_BAD_MODE, or PI_NOT_PERMITTED
-  if(set_mode(pi, THROTTLE_PIN, PI_OUTPUT) != 0) {
-    std::cerr << "Error setting GPIO " << THROTTLE_PIN << ": ";
-    switch(pi) {
-      case PI_BAD_GPIO: std::cerr << "BAD GPIO";
-        break;
-      case PI_BAD_MODE: std::cerr << "BAD GPIO MODE";
-        break;
-      case PI_NOT_PERMITTED: std::cerr << "Permission denied";
-        break;
-    }
-    std::cerr << std::endl;
-    return ERROR_CONNECTION_FAILED;
-  }
-
-  // Setup the GPIO pins
-  // TODO: put this to the Controller class
-  // PI_BAD_GPIO, PI_BAD_MODE, or PI_NOT_PERMITTED
-  if(set_mode(pi, STEERING_PIN, PI_OUTPUT) != 0) {
-    std::cerr << "Error setting GPIO " << STEERING_PIN << ": ";
-    switch(pi) {
-      case PI_BAD_GPIO: std::cerr << "BAD GPIO";
-        break;
-      case PI_BAD_MODE: std::cerr << "BAD GPIO MODE";
-        break;
-      case PI_NOT_PERMITTED: std::cerr << "Permission denied";
-        break;
-    }
-    std::cerr << std::endl;
-    return ERROR_CONNECTION_FAILED;
-  }
-
-
-  std::cout << "--- Starting truck controller ---" << std::endl;
-
-  // Controller
-  TruckController controller = TruckController(pi, nodeHandler, THROTTLE_PIN, STEERING_PIN);
-
-  // Subscribe message handlers
-  ros::Subscriber subThrottle = nodeHandler.subscribe(
-    TOPIC_THROTTLE,
-    MSG_QUEUE_SIZE,
-    &TruckController::onThrottleMsg,
-    &controller
-  );
-
-  ros::Subscriber subSteering = nodeHandler.subscribe(
-    TOPIC_STEERING,
-    MSG_QUEUE_SIZE,
-    &TruckController::onSteeringMsg,
-    &controller
-  );
+  // Instantiate the controller and start listeners
+  TruckController controller = TruckController(config, pi, nodeHandler);
+  if(!controller.initGPIO()) { return ERROR_GPIO_MODE_SETUP_FAILED; }
+  if(!controller.registerListeners()) { return ERROR_LISTENER_REGISTER_FAILED; }
 
   // Start the ROS node
   ROS_INFO("Starting truck controller node...");
