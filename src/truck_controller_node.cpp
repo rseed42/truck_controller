@@ -44,6 +44,27 @@ public:
   bool getDebug() { return debug; }
 };
 //------------------------------------------------------------------------------
+// Listener
+//------------------------------------------------------------------------------
+class ServoListener {
+  const bool debug;
+  const int piHandle;
+  const int pinServo;
+public:
+  ServoListener(const int pi, const int pin, const bool debugOn) :
+    piHandle(pi), pinServo(pin), debug(debugOn){
+  }
+  void onServoMessage(const std_msgs::UInt32::ConstPtr& message) {
+    if(debug)
+      printf("Received steering: %d\n", message->data);
+    // Set the pulse width specified in the message
+    int pulseWidth = (int)message->data;
+    if(pulseWidth > 2000) { pulseWidth == 2000; }
+    else if(pulseWidth < 1000) { pulseWidth == 1000; }
+    set_servo_pulsewidth(piHandle, pinServo, pulseWidth);
+  }
+};
+//------------------------------------------------------------------------------
 // Controller
 //------------------------------------------------------------------------------
 class TruckController {
@@ -52,6 +73,23 @@ private:
   const ros::NodeHandle nodeHandle;
   const int pinThrottle;
   const int pinSteering;
+
+  // GPIO Setup. Sets mode to OUTPUT.
+  bool setupGPIO(const int pin) {
+    if(set_mode(piHandle, pin, PI_OUTPUT) != 0) {
+      std::cerr << "Error setting GPIO " << pin << ": ";
+      switch(piHandle) {
+        case PI_BAD_GPIO: std::cerr << "BAD GPIO";
+          return false;
+        case PI_BAD_MODE: std::cerr << "BAD GPIO MODE";
+          return false;
+        case PI_NOT_PERMITTED: std::cerr << "Permission denied";
+          return false;
+      }
+      std::cerr << std::endl;
+    }
+    return true;
+  }
 
 public:
   TruckController(const int pi, ros::NodeHandle& nh, const int throttle, const int steering) :
