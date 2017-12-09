@@ -1,11 +1,15 @@
 <!-- http://wiki.ros.org/roslaunch/XML/node -->
 <launch>
   <node name="truck_controller_node" pkg="truck_controller" type="truck_controller_node" output="screen">
-    <param name="throttle-pin" type="int" value="25" />
-    <param name="steering-pin" type="int" value="18" />
-    <param name="message-queue-size" type="int" value="10" />
-    <param name="topic-throttle" type="string" value="/controller/throttle" />
-    <param name="topic-steering" type="string" value="/controller/steering" />
-    <param name="debug" type="bool" value="false" />
+    <param name="steering_pin" type="int" value="26" />
+    <param name="throttle_pin" type="int" value="19" />
+    <param name="shift_pin" type="int" value="13" />
+    <param name="leg_pin" type="int" value="6" />
+    <param name="message_queue-size" type="int" value="10" />
+    <param name="topic_throttle" type="string" value="/controller/throttle" />
+    <param name="topic_steering" type="string" value="/controller/steering" />
+    <param name="topic_shift" type="string" value="/controller/shift" />
+    <param name="topic_leg" type="string" value="/controller/leg" />
+    <param name="debug" type="bool" value="true" />
   </node>
 </launch>

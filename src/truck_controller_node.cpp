@@ -13,35 +13,55 @@ using namespace std;
 //------------------------------------------------------------------------------
 // Default parameters
 //------------------------------------------------------------------------------
-const int THROTTLE_PIN = 25;
-const int STEERING_PIN = 18;
+const int STEERING_PIN = 26;
+const int THROTTLE_PIN = 19;
+const int SHIFT_PIN = 13;
+const int LEG_PIN = 6;
 const int MSG_QUEUE_SIZE = 10;
 const string TOPIC_THROTTLE = "/controller/throttle";
 const string TOPIC_STEERING = "/controller/steering";
+const string TOPIC_SHIFT = "/controller/shift";
+const string TOPIC_LEG = "/controller/leg";
 //------------------------------------------------------------------------------
 // Configuration object
 //------------------------------------------------------------------------------
 class TruckConfiguration {
   int throttlePin;
   int steeringPin;
+  int shiftPin;
+  int legPin;
   int msgQueueSize;
   string topicThrottle;
   string topicSteering;
+  string topicShift;
+  string topicLeg;
   bool debug;
 public:
   TruckConfiguration(const ros::NodeHandle& nh) {
     nh.param<int>("throttle_pin", throttlePin, THROTTLE_PIN);
     nh.param<int>("steering_pin", steeringPin, STEERING_PIN);
+    nh.param<int>("shift_pin", shiftPin, SHIFT_PIN);
+    nh.param<int>("leg_pin", legPin, LEG_PIN);
     nh.param<int>("message_queue_size", msgQueueSize, MSG_QUEUE_SIZE);
     nh.param<std::string>("topic_throttle", topicThrottle, TOPIC_THROTTLE);
     nh.param<std::string>("topic_steering", topicSteering, TOPIC_STEERING);
+    nh.param<std::string>("topic_shift", topicShift, TOPIC_SHIFT);
+    nh.param<std::string>("topic_leg", topicLeg, TOPIC_LEG);
     nh.param<bool>("debug", debug, false);
+    std::cout << "Throttle GPIO pin: " << throttlePin << std::endl;
+    std::cout << "Steering GPIO pin: " << steeringPin << std::endl;
+    std::cout << "Shift GPIO pin: " << shiftPin << std::endl;
+    std::cout << "Leg GPIO pin: " << legPin << std::endl;
   }
   int getThrottlePin() { return throttlePin; }
   int getSteeringPin() { return steeringPin; }
+  int getShiftPin() { return shiftPin; }
+  int getLegPin() { return legPin; }
   int getMsgQueueSize() { return msgQueueSize; }
   std::string getTopicThrottle() { return topicThrottle; }
   std::string getTopicSteering() { return topicSteering; }
+  std::string getTopicShift() { return topicShift; }
+  std::string getTopicLeg() { return topicLeg; }
   bool getDebug() { return debug; }
 };
 //------------------------------------------------------------------------------
@@ -84,6 +104,8 @@ private:
   TruckConfiguration config;
   ServoListener throttleListener;
   ServoListener steeringListener;
+  ServoListener shiftListener;
+  ServoListener legListener;
   // GPIO Setup. Sets mode to OUTPUT.
   bool setupGPIO(const int pin) {
     if(set_mode(piHandle, pin, PI_OUTPUT) != 0) {
@@ -107,18 +129,27 @@ public:
     piHandle(pi),
     nodeHandle(nh),
     throttleListener("throttle listener", pi, truckConfig.getThrottlePin(), truckConfig.getDebug()),
-    steeringListener("steering listener", pi, truckConfig.getSteeringPin(), truckConfig.getDebug()) {
+    steeringListener("steering listener", pi, truckConfig.getSteeringPin(), truckConfig.getDebug()),
+    shiftListener("shift listener", pi, truckConfig.getShiftPin(), truckConfig.getDebug()),
+    legListener("leg listener", pi, truckConfig.getLegPin(), truckConfig.getDebug()) {
   }
   bool initGPIO() {
     // This will stop evaluation on the first failed setup and return false
-    return setupGPIO(config.getThrottlePin()) && setupGPIO(config.getSteeringPin());
+    return
+      setupGPIO(config.getThrottlePin()) &&
+      setupGPIO(config.getSteeringPin()) &&
+      setupGPIO(config.getShiftPin()) &&
+      setupGPIO(config.getLegPin());
+
   }
   bool registerListeners() {
      // Subscribe both listeners or fail on error
-    return throttleListener.subscribe(nodeHandle, config.getTopicThrottle(), config.getMsgQueueSize()) &&
-           steeringListener.subscribe(nodeHandle, config.getTopicSteering(), config.getMsgQueueSize());
+    return
+      throttleListener.subscribe(nodeHandle, config.getTopicThrottle(), config.getMsgQueueSize()) &&
+      steeringListener.subscribe(nodeHandle, config.getTopicSteering(), config.getMsgQueueSize()) &&
+      shiftListener.subscribe(nodeHandle, config.getTopicShift(), config.getMsgQueueSize()) &&
+      legListener.subscribe(nodeHandle, config.getTopicLeg(), config.getMsgQueueSize());
   }
-
 };
 //------------------------------------------------------------------------------
 // Main
